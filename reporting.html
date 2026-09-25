@@ -22,6 +22,7 @@
   @media (max-width: 900px) { .proj { grid-template-columns: 1fr; } }
   .proj label { font-size: 12px; font-weight: 700; color: var(--grey); display: block; margin-bottom: 4px; }
   .proj input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 14px; }
+  .fixedv { padding: 8px 0; font-size: 26px; font-weight: 800; color: var(--blue); }
   .projr { background: var(--soft); border-radius: 10px; padding: 14px 16px; }
   .projr b { font-size: 26px; color: var(--blue); }
   .projr span { display: block; color: var(--grey); font-size: 12px; margin-top: 2px; }
@@ -49,7 +50,7 @@
   <div class="card" style="margin-bottom:18px">
     <h2>Temps de tri libéré sur vos volumes (estimation)</h2>
     <div class="proj">
-      <div><label>Candidatures par semaine</label><input id="pw" type="number" value="100" min="0"></div>
+      <div><label>Candidatures cette semaine</label><div class="fixedv" id="pw">92</div></div>
       <div><label>Minutes gagnées par candidature (hypothèse)</label><input id="pm" type="number" value="3" min="0" step="0.5"></div>
       <div class="projr" id="pr"></div>
     </div>
@@ -88,12 +89,13 @@ document.getElementById("kpis").innerHTML = [
   ["Réponses fiables", fiables + " / " + CANDIDATS.length, "fiabilité bonne ou excellente"]
 ].map(([t, v, s]) => `<div class="kpi"><div class="kv">${v}</div><div class="kt">${t}</div><div class="ks">${s}</div></div>`).join("");
 
+const CANDIDATURES_SEMAINE = 92;
 function proj() {
-  const pw = +document.getElementById("pw").value || 0, pm = +document.getElementById("pm").value || 0;
-  const cand = pw * 13, h = Math.round(cand * pm / 60);
-  document.getElementById("pr").innerHTML = `<b>${h} h</b><span>libérées par trimestre sur environ ${cand.toLocaleString("fr-FR")} candidatures, soit environ ${(h / 8).toFixed(1).replace(".", ",")} jours de travail.</span>`;
+  const pm = +document.getElementById("pm").value || 0;
+  const cand = CANDIDATURES_SEMAINE * 13, h = Math.round(cand * pm / 60);
+  document.getElementById("pr").innerHTML = `<b>${h} h</b><span>libérées par trimestre sur environ ${cand.toLocaleString("fr-FR")} candidatures (${CANDIDATURES_SEMAINE} par semaine sur 13 semaines), soit environ ${(h / 8).toFixed(1).replace(".", ",")} jours de travail.</span>`;
 }
-["pw", "pm"].forEach(id => document.getElementById(id).oninput = proj); proj();
+document.getElementById("pm").oninput = proj; proj();
 
 const byPoste = refs.map(r => { const l = rows.filter(x => x.c.ref === r); return { r, t: l[0].c.poste, n: l.length, m: avg(l.map(x => x.a)) }; });
 document.getElementById("byPoste").innerHTML = byPoste.map(p => `<div class="brow" style="grid-template-columns:200px 1fr 90px"><span><b>${p.r}</b><br><small style="color:var(--grey)">${p.t} · ${p.n} candidat${p.n > 1 ? "s" : ""}</small></span><div class="bt"><i style="width:${p.m}%;background:${COL[niveauAdq(p.m)]}"></i></div><b>${p.m} %</b></div>`).join("");

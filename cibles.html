@@ -20,7 +20,7 @@
   <div class="pagehead">
     <div>
       <h1>Profils cibles par poste</h1>
-      <p class="sub">Chaque poste a un profil cible prédéfini par TOPI. Ajustez-le : le classement des candidats se met à jour immédiatement.</p>
+      <p class="sub">Chaque poste a un profil cible prédéfini par TOPI. Ajustez-le, choisissez les parties qui comptent et leur importance : le classement des candidats se met à jour immédiatement.</p>
     </div>
   </div>
   <div class="editor">
@@ -29,6 +29,7 @@
     <div class="card rank" id="rank"></div>
   </div>
 </main>
+<div id="tooltip" class="tooltip" role="tooltip"></div>
 <script src="data.js"></script>
 <script src="defs.js"></script>
 <script src="scoring.js"></script>
@@ -38,6 +39,14 @@ const refs = Object.keys(CIBLES_DEFAUT);
 const titres = Object.fromEntries(CANDIDATS.map(c => [c.ref, c.poste]));
 let ref = refs.includes(params.get("ref")) ? params.get("ref") : refs[0];
 let cible = getCible(ref);
+
+const esc = s => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+const tip = (kind, key, inner) => `<span class="tip" data-kind="${kind}" data-key="${esc(key)}">${inner}</span>`;
+const SECTIONS = [
+  { k: "riasec", titre: "Intérêts professionnels (RIASEC)", sec: "sec-r" },
+  { k: "axes", titre: "Styles de travail", sec: "sec-a" },
+  { k: "crit", titre: "Motivations que le poste peut offrir", sec: "sec-c" }
+];
 
 const commit = () => { saveCible(ref, cible); renderList(); renderHead(); renderRank(); };
 
@@ -56,48 +65,86 @@ function renderHead() {
   h.querySelector("p").textContent = isModified(ref) ? "Profil modifié par vous. Vous pouvez revenir au profil prédéfini par TOPI." : "Profil prédéfini par TOPI pour ce poste. Modifiable à tout moment.";
 }
 
+// ---- pondération des 3 parties ----
+function refreshWeights() {
+  const eff = poidsEffectifs(cible), nbActifs = SECTIONS.filter(s => cible.actifs[s.k]).length;
+  SECTIONS.forEach(s => {
+    const w = document.querySelector(`.wctl[data-k="${s.k}"]`), on = cible.actifs[s.k];
+    w.querySelector('input[type=checkbox]').checked = on;
+    const rg = w.querySelector("input[type=range]");
+    rg.value = eff[s.k]; rg.disabled = !on || nbActifs === 1;
+    w.querySelector("b").textContent = on ? eff[s.k] + " %" : "Exclu";
+    w.classList.toggle("off", !on);
+    document.getElementById(s.sec).parentElement.classList.toggle("secoff", !on);
+  });
+  const t = document.getElementById("wsum");
+  if (t) t.textContent = nbActifs === 1 ? "Une seule partie est comptée : elle pèse 100 %." : "Répartition : " + SECTIONS.filter(s => cible.actifs[s.k]).map(s => eff[s.k] + " %").join(" · ");
+}
+
+function bindWeights() {
+  SECTIONS.forEach(s => {
+    const w = document.querySelector(`.wctl[data-k="${s.k}"]`);
+    w.querySelector('input[type=checkbox]').onchange = ev => {
+      if (!ev.target.checked && SECTIONS.filter(x => cible.actifs[x.k]).length === 1) { ev.target.checked = true; return; }
+      cible.actifs[s.k] = ev.target.checked; refreshWeights(); commit();
+    };
+    w.querySelector("input[type=range]").oninput = ev => {
+      const v = +ev.target.value, others = SECTIONS.filter(x => x.k !== s.k && cible.actifs[x.k]);
+      if (!others.length) return;
+      const raw = others.reduce((a, x) => a + cible.poids[x.k], 0);
+      cible.poids[s.k] = v;
+      others.forEach(x => cible.poids[x.k] = Math.max(0, Math.round(raw ? (100 - v) * cible.poids[x.k] / raw : (100 - v) / others.length)));
+      refreshWeights(); commit();
+    };
+  });
+  refreshWeights();
+}
+
+function wctl(s) {
+  return `<div class="sechead"><h2>${s.titre}</h2><div class="wctl" data-k="${s.k}"><label class="sw" title="Compter cette partie dans l'adéquation"><input type="checkbox"><span></span></label><span class="wl">Importance</span><input type="range" min="0" max="100"><b></b></div></div>`;
+}
+
 function buildEditor() {
   const el = document.getElementById("editor");
   el.innerHTML = `
     <div class="edhead" id="edhead"><div><h1>${ref} · ${titres[ref]}</h1><p></p></div><button class="btn" id="restore">Restaurer le profil prédéfini</button></div>
-    <div class="card edcard"><h2>Intérêts professionnels (RIASEC)</h2><div id="sec-r"></div></div>
-    <div class="card edcard"><h2>Styles de travail</h2><div id="sec-a"></div></div>
-    <div class="card edcard"><h2>Motivations que le poste peut offrir</h2><div id="sec-c"></div></div>`;
+    <div class="card wsumcard"><span id="wsum"></span><span class="hint2">Activez ou désactivez chaque partie et réglez son importance dans le calcul de l'adéquation.</span></div>
+    <div class="card edcard">${wctl(SECTIONS[0])}<div id="sec-r"></div></div>
+    <div class="card edcard">${wctl(SECTIONS[1])}<div id="sec-a"></div></div>
+    <div class="card edcard">${wctl(SECTIONS[2])}<div id="sec-c"></div></div>`;
   document.getElementById("restore").onclick = () => { resetCible(ref); cible = getCible(ref); buildEditor(); commit(); };
 
-  // RIASEC : toujours actifs
   const sr = document.getElementById("sec-r");
   RIA_ORDER.forEach(k => {
     const row = document.createElement("div"); row.className = "slrow nocheck";
-    row.innerHTML = `<span>${RIASEC_LABELS[k]}</span><input type="range" min="0" max="100" value="${cible.riasec[k]}"><span class="v">${cible.riasec[k]}</span>`;
+    row.innerHTML = `<span>${tip("riasec", k, RIASEC_LABELS[k])}</span><input type="range" min="0" max="100" value="${cible.riasec[k]}"><span class="v">${cible.riasec[k]}</span>`;
     const inp = row.querySelector("input"), v = row.querySelector(".v");
     inp.oninput = () => { cible.riasec[k] = +inp.value; v.textContent = inp.value; commit(); };
     sr.appendChild(row);
   });
 
-  // Styles de travail : axe gauche <-> droite, avec case "compter"
   const sa = document.getElementById("sec-a");
   AXES.forEach((pair, i) => {
     const on = cible.axes[i] != null, val = on ? cible.axes[i] : 50;
     const row = document.createElement("div"); row.className = "slrow ax" + (on ? "" : " off");
-    row.innerHTML = `<input type="checkbox" ${on ? "checked" : ""} title="Compter ce critère"><span title="${DIMENSIONS_TITRES[i]}">${pair[0]}</span><input type="range" min="0" max="100" value="${val}" ${on ? "" : "disabled"}><span class="rt">${pair[1]}</span><span class="v">${on ? val : "-"}</span>`;
+    row.innerHTML = `<input type="checkbox" ${on ? "checked" : ""} title="Compter ce critère"><span>${tip("style", pair[0], pair[0])}</span><input type="range" min="0" max="100" value="${val}" ${on ? "" : "disabled"}><span class="rt">${tip("style", pair[1], pair[1])}</span><span class="v">${on ? val : "-"}</span>`;
     const [cb, , rg, , v] = [...row.children];
     cb.onchange = () => { if (cb.checked) { cible.axes[i] = +rg.value; rg.disabled = false; row.classList.remove("off"); v.textContent = rg.value; } else { delete cible.axes[i]; rg.disabled = true; row.classList.add("off"); v.textContent = "-"; } commit(); };
     rg.oninput = () => { cible.axes[i] = +rg.value; v.textContent = rg.value; commit(); };
     sa.appendChild(row);
   });
 
-  // Motivations : 20 critères, avec case "compter"
   const sc = document.getElementById("sec-c");
   CRITERES.forEach(k => {
     const on = cible.crit[k] != null, val = on ? cible.crit[k] : 50;
     const row = document.createElement("div"); row.className = "slrow" + (on ? "" : " off");
-    row.innerHTML = `<input type="checkbox" ${on ? "checked" : ""} title="Compter ce critère"><span title="${DEF_CRITERES[k]}">${k}</span><input type="range" min="0" max="100" value="${val}" ${on ? "" : "disabled"}><span class="v">${on ? val : "-"}</span>`;
+    row.innerHTML = `<input type="checkbox" ${on ? "checked" : ""} title="Compter ce critère"><span>${tip("critere", k, k)}</span><input type="range" min="0" max="100" value="${val}" ${on ? "" : "disabled"}><span class="v">${on ? val : "-"}</span>`;
     const [cb, , rg, v] = [...row.children];
     cb.onchange = () => { if (cb.checked) { cible.crit[k] = +rg.value; rg.disabled = false; row.classList.remove("off"); v.textContent = rg.value; } else { delete cible.crit[k]; rg.disabled = true; row.classList.add("off"); v.textContent = "-"; } commit(); };
     rg.oninput = () => { cible.crit[k] = +rg.value; v.textContent = rg.value; commit(); };
     sc.appendChild(row);
   });
+  bindWeights();
   renderHead();
 }
 
@@ -110,6 +157,32 @@ function renderRank() {
 
 function renderAll() { renderList(); buildEditor(); renderRank(); }
 renderAll();
+
+// ---- définitions au survol (identique aux profils candidats) ----
+const tt = document.getElementById("tooltip");
+function content(el) {
+  const kind = el.dataset.kind, key = el.dataset.key;
+  if (kind === "riasec") return [RIASEC_LABELS[key], DEF_RIASEC[key]];
+  if (kind === "critere") return [key, DEF_CRITERES[key]];
+  const i = AXES.findIndex(p => p.includes(key));
+  return [key + " (" + DIMENSIONS[i] + ")", DEF_STYLES[key]];
+}
+function place(e) {
+  const pad = 14, w = tt.offsetWidth, h = tt.offsetHeight;
+  let x = e.clientX + pad, y = e.clientY + pad;
+  if (x + w > innerWidth - 8) x = e.clientX - w - pad;
+  if (y + h > innerHeight - 8) y = e.clientY - h - pad;
+  tt.style.left = Math.max(8, x) + "px"; tt.style.top = Math.max(8, y) + "px";
+}
+document.addEventListener("mouseover", e => {
+  const el = e.target.closest(".tip");
+  if (!el) return;
+  const [title, text] = content(el);
+  tt.innerHTML = `<b>${title}</b><span>${text}</span>`;
+  tt.style.display = "block"; place(e);
+});
+document.addEventListener("mousemove", e => { if (tt.style.display === "block") place(e); });
+document.addEventListener("mouseout", e => { if (e.target.closest(".tip")) tt.style.display = "none"; });
 </script>
 </body>
 </html>

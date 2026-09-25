@@ -31,12 +31,24 @@ const CIBLES_DEFAUT = {
 };
 
 const CIBLE_STORE = "topi-nge-cibles-v1";
-const POIDS = { riasec: 0.4, axes: 0.3, crit: 0.3 };
+const POIDS_DEFAUT = { riasec: 40, axes: 30, crit: 30 };
 const SEVERITE = 5, TOLERANCE = 2.5;
 
 const clone = o => JSON.parse(JSON.stringify(o));
 function overrides() { try { return JSON.parse(localStorage.getItem(CIBLE_STORE) || "{}"); } catch (e) { return {}; } }
-function getCible(ref) { const o = overrides(); return clone(o[ref] || CIBLES_DEFAUT[ref]); }
+function normCible(c) {
+  c.poids = Object.assign({}, POIDS_DEFAUT, c.poids || {});
+  c.actifs = Object.assign({ riasec: true, axes: true, crit: true }, c.actifs || {});
+  return c;
+}
+function getCible(ref) { const o = overrides(); return normCible(clone(o[ref] || CIBLES_DEFAUT[ref])); }
+function poidsEffectifs(cible) {
+  const act = ["riasec", "axes", "crit"].filter(k => cible.actifs[k]);
+  const tot = act.reduce((s, k) => s + cible.poids[k], 0) || 1;
+  const out = { riasec: 0, axes: 0, crit: 0 };
+  act.forEach(k => out[k] = Math.round(cible.poids[k] / tot * 100));
+  return out;
+}
 function saveCible(ref, cible) { const o = overrides(); o[ref] = cible; try { localStorage.setItem(CIBLE_STORE, JSON.stringify(o)); } catch (e) {} }
 function resetCible(ref) { const o = overrides(); delete o[ref]; try { localStorage.setItem(CIBLE_STORE, JSON.stringify(o)); } catch (e) {} }
 function isModified(ref) { return !!overrides()[ref]; }
@@ -49,12 +61,16 @@ function adequation(c, cible) {
   Object.entries(cible.axes || {}).forEach(([i, t]) => items.axes.push({ label: DIMENSIONS_TITRES[i], cand: c.axes[i], target: t, kind: "axes", idx: +i, cw: poleWord(+i, c.axes[i]), tw: poleWord(+i, t) }));
   Object.entries(cible.crit || {}).forEach(([k, t]) => { const i = CRITERES.indexOf(k); if (i >= 0) items.crit.push({ label: k, cand: c.attentes[i], target: t, kind: "crit" }); });
   const bloc = arr => arr.length ? Math.max(0, Math.round(100 - SEVERITE * Math.max(0, arr.reduce((s, p) => s + Math.abs(p.cand - p.target), 0) / arr.length - TOLERANCE))) : null;
-  const scores = { riasec: bloc(items.riasec), axes: bloc(items.axes), crit: bloc(items.crit) };
+  const cb = normCible(cible);
+  const scores = {};
+  ["riasec", "axes", "crit"].forEach(k => scores[k] = cb.actifs[k] ? bloc(items[k]) : null);
   let num = 0, den = 0;
-  Object.keys(POIDS).forEach(k => { if (scores[k] != null) { num += POIDS[k] * scores[k]; den += POIDS[k]; } });
-  const all = [...items.riasec, ...items.axes, ...items.crit].map(p => ({ ...p, diff: Math.abs(p.cand - p.target) }));
+  Object.keys(scores).forEach(k => { if (scores[k] != null) { num += cb.poids[k] * scores[k]; den += cb.poids[k]; } });
+  const poids = {};
+  Object.keys(scores).forEach(k => poids[k] = scores[k] == null || !den ? 0 : Math.round(cb.poids[k] / den * 100));
+  const all = [...(scores.riasec != null ? items.riasec : []), ...(scores.axes != null ? items.axes : []), ...(scores.crit != null ? items.crit : [])].map(p => ({ ...p, diff: Math.abs(p.cand - p.target) }));
   const sorted = all.slice().sort((a, b) => a.diff - b.diff);
-  return { global: den ? Math.round(num / den) : 0, scores, items, convergences: sorted.slice(0, 3), ecarts: sorted.slice(-3).reverse() };
+  return { global: den ? Math.round(num / den) : 0, scores, poids, items, convergences: sorted.slice(0, 3), ecarts: sorted.slice(-3).reverse() };
 }
 
 function niveauAdq(p) { return p >= 75 ? "high" : p >= 60 ? "mid" : "low"; }

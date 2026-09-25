@@ -72,7 +72,7 @@ const axes = AXES.map((pair, i) => {
   return `<div class="axis"><div class="${s < 45 ? "on" : ""}">${tip("style", pair[0], pair[0], i.toString())}</div><div class="line">${t != null ? `<div class="tgt" style="left:${t}%" title="Profil cible : ${t}"></div>` : ""}<div class="dot" style="left:${s}%"></div></div><div class="r ${s > 55 ? "on" : ""}">${tip("style", pair[1], pair[1], i.toString())}</div></div>`;
 }).join("");
 
-const subBar = (label, v) => v == null ? "" : `<div class="sub"><div class="sl"><span>${label}</span><b>${v}%</b></div><div class="track"><div class="fill ad-${niveauAdq(v)}" style="width:${v}%"></div></div></div>`;
+const subBar = (label, v, w) => v == null ? `<div class="sub off"><div class="sl"><span>${label}</span><b>Non comptée</b></div></div>` : `<div class="sub"><div class="sl"><span>${label} <small>· importance ${w} %</small></span><b>${v}%</b></div><div class="track"><div class="fill ad-${niveauAdq(v)}" style="width:${v}%"></div></div></div>`;
 const fmtItem = it => it.kind === "axes" && it.cw !== it.tw
   ? `<b>${it.label}</b><small>candidat : ${it.cw}, poste : ${it.tw}</small>`
   : `<b>${it.label}</b><small>candidat ${it.cand}, poste ${it.target}</small>`;
@@ -98,9 +98,9 @@ document.getElementById("app").innerHTML = `
     <div class="gcol">${gauge(adq.global)}<div class="gt">Adéquation au poste</div></div>
     <div class="scol">
       <h2>Détail par dimension</h2>
-      ${subBar("Intérêts professionnels (RIASEC)", adq.scores.riasec)}
-      ${subBar("Styles de travail", adq.scores.axes)}
-      ${subBar("Motivations", adq.scores.crit)}
+      ${subBar("Intérêts professionnels (RIASEC)", adq.scores.riasec, adq.poids.riasec)}
+      ${subBar("Styles de travail", adq.scores.axes, adq.poids.axes)}
+      ${subBar("Motivations", adq.scores.crit, adq.poids.crit)}
       <a class="link" href="cibles.html?ref=${c.ref}" target="_blank" rel="noopener">Voir ou modifier le profil cible du poste ${c.ref}</a>
     </div>
     <div class="ccol"><h2>Points de convergence</h2>${adq.convergences.map(it => `<div class="pt ok">${fmtItem(it)}</div>`).join("")}</div>

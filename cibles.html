@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Profils cibles - TOPI x NGen</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="topbar">
+  <div class="logo"><img src="topi-logo.png" alt="">TOPI</div>
+  <div class="sep"></div>
+  <img class="ngen" src="ngen-logo.svg" alt="NGen">
+  <nav><a href="index.html">Candidatures</a><a href="cibles.html" class="on">Profils cibles</a><a href="compare.html">Comparaison</a><a href="reporting.html">Reporting</a></nav>
+  <div class="right">Espace recruteur · démonstration</div>
+</div>
+<main class="wide">
+  <div class="pagehead">
+    <div>
+      <h1>Profils cibles par poste</h1>
+      <p class="sub">Chaque poste a un profil cible prédéfini par TOPI. Ajustez-le : le classement des candidats se met à jour immédiatement.</p>
+    </div>
+  </div>
+  <div class="editor">
+    <div class="plist" id="plist"></div>
+    <div id="editor"></div>
+    <div class="card rank" id="rank"></div>
+  </div>
+</main>
+<script src="data.js"></script>
+<script src="defs.js"></script>
+<script src="scoring.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const refs = Object.keys(CIBLES_DEFAUT);
+const titres = Object.fromEntries(CANDIDATS.map(c => [c.ref, c.poste]));
+let ref = refs.includes(params.get("ref")) ? params.get("ref") : refs[0];
+let cible = getCible(ref);
+
+const commit = () => { saveCible(ref, cible); renderList(); renderHead(); renderRank(); };
+
+function renderList() {
+  document.getElementById("plist").innerHTML = refs.map(r => {
+    const n = CANDIDATS.filter(c => c.ref === r).length;
+    return `<button data-ref="${r}" class="${r === ref ? "on" : ""}"><b>${r}</b>${titres[r]}<small><span>${n} candidat${n > 1 ? "s" : ""}</span>${isModified(r) ? '<span class="mod">Modifié</span>' : "<span>Prédéfini</span>"}</small></button>`;
+  }).join("");
+  document.querySelectorAll("#plist button").forEach(b => b.onclick = () => { ref = b.dataset.ref; cible = getCible(ref); history.replaceState(null, "", "?ref=" + ref); renderAll(); });
+}
+
+function renderHead() {
+  const h = document.getElementById("edhead");
+  if (!h) return;
+  h.querySelector("button").style.visibility = isModified(ref) ? "visible" : "hidden";
+  h.querySelector("p").textContent = isModified(ref) ? "Profil modifié par vous. Vous pouvez revenir au profil prédéfini par TOPI." : "Profil prédéfini par TOPI pour ce poste. Modifiable à tout moment.";
+}
+
+function buildEditor() {
+  const el = document.getElementById("editor");
+  el.innerHTML = `
+    <div class="edhead" id="edhead"><div><h1>${ref} · ${titres[ref]}</h1><p></p></div><button class="btn" id="restore">Restaurer le profil prédéfini</button></div>
+    <div class="card edcard"><h2>Intérêts professionnels (RIASEC)</h2><div id="sec-r"></div></div>
+    <div class="card edcard"><h2>Styles de travail</h2><div id="sec-a"></div></div>
+    <div class="card edcard"><h2>Motivations que le poste peut offrir</h2><div id="sec-c"></div></div>`;
+  document.getElementById("restore").onclick = () => { resetCible(ref); cible = getCible(ref); buildEditor(); commit(); };
+
+  // RIASEC : toujours actifs
+  const sr = document.getElementById("sec-r");
+  RIA_ORDER.forEach(k => {
+    const row = document.createElement("div"); row.className = "slrow nocheck";
+    row.innerHTML = `<span>${RIASEC_LABELS[k]}</span><input type="range" min="0" max="100" value="${cible.riasec[k]}"><span class="v">${cible.riasec[k]}</span>`;
+    const inp = row.querySelector("input"), v = row.querySelector(".v");
+    inp.oninput = () => { cible.riasec[k] = +inp.value; v.textContent = inp.value; commit(); };
+    sr.appendChild(row);
+  });
+
+  // Styles de travail : axe gauche <-> droite, avec case "compter"
+  const sa = document.getElementById("sec-a");
+  AXES.forEach((pair, i) => {
+    const on = cible.axes[i] != null, val = on ? cible.axes[i] : 50;
+    const row = document.createElement("div"); row.className = "slrow ax" + (on ? "" : " off");
+    row.innerHTML = `<input type="checkbox" ${on ? "checked" : ""} title="Compter ce critère"><span title="${DIMENSIONS_TITRES[i]}">${pair[0]}</span><input type="range" min="0" max="100" value="${val}" ${on ? "" : "disabled"}><span class="rt">${pair[1]}</span><span class="v">${on ? val : "-"}</span>`;
+    const [cb, , rg, , v] = [...row.children];
+    cb.onchange = () => { if (cb.checked) { cible.axes[i] = +rg.value; rg.disabled = false; row.classList.remove("off"); v.textContent = rg.value; } else { delete cible.axes[i]; rg.disabled = true; row.classList.add("off"); v.textContent = "-"; } commit(); };
+    rg.oninput = () => { cible.axes[i] = +rg.value; v.textContent = rg.value; commit(); };
+    sa.appendChild(row);
+  });
+
+  // Motivations : 20 critères, avec case "compter"
+  const sc = document.getElementById("sec-c");
+  CRITERES.forEach(k => {
+    const on = cible.crit[k] != null, val = on ? cible.crit[k] : 50;
+    const row = document.createElement("div"); row.className = "slrow" + (on ? "" : " off");
+    row.innerHTML = `<input type="checkbox" ${on ? "checked" : ""} title="Compter ce critère"><span title="${DEF_CRITERES[k]}">${k}</span><input type="range" min="0" max="100" value="${val}" ${on ? "" : "disabled"}><span class="v">${on ? val : "-"}</span>`;
+    const [cb, , rg, v] = [...row.children];
+    cb.onchange = () => { if (cb.checked) { cible.crit[k] = +rg.value; rg.disabled = false; row.classList.remove("off"); v.textContent = rg.value; } else { delete cible.crit[k]; rg.disabled = true; row.classList.add("off"); v.textContent = "-"; } commit(); };
+    rg.oninput = () => { cible.crit[k] = +rg.value; v.textContent = rg.value; commit(); };
+    sc.appendChild(row);
+  });
+  renderHead();
+}
+
+function renderRank() {
+  const list = CANDIDATS.filter(c => c.ref === ref).map(c => ({ c, a: adequation(c, cible) })).sort((x, y) => y.a.global - x.a.global);
+  document.getElementById("rank").innerHTML = `<h2>Classement des candidats</h2>` + list.map((r, i) => `
+    <div class="rrow"><span class="n">${i + 1}</span><div><a href="profil.html?id=${r.c.id}" target="_blank" rel="noopener">${r.c.prenom} ${r.c.nom}</a><small>${r.c.parcours}</small>
+    <div class="adq ${niveauAdq(r.a.global)}"><b>${r.a.global}%</b><span class="abar"><i style="width:${r.a.global}%"></i></span></div></div></div>`).join("");
+}
+
+function renderAll() { renderList(); buildEditor(); renderRank(); }
+renderAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>CV</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  body { background: #E9E8E4; }
+  .viewer { max-width: 900px; margin: 0 auto; padding: 24px 16px 48px; }
+  .bar2 { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .bar2 h1 { font-size: 16px; margin: 0; }
+  .bar2 .btn { margin-left: auto; text-decoration: none; }
+  canvas { display: block; width: 100%; height: auto; background: #fff; margin: 0 auto 16px; box-shadow: 0 2px 14px rgba(27, 29, 26, .18); }
+  .msg { color: var(--grey); text-align: center; padding: 40px 0; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="logo"><img src="topi-logo.png" alt="">TOPI</div>
+  <div class="sep"></div>
+  <img class="ngen" src="ngen-logo.svg" alt="NGen">
+  <div class="right">Curriculum vitae · démonstration</div>
+</div>
+<div class="viewer">
+  <div class="bar2">
+    <h1 id="title">Chargement du CV...</h1>
+    <a class="btn" id="dl" download>Télécharger le PDF</a>
+  </div>
+  <div id="pages"><div class="msg">Chargement...</div></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+const p = new URLSearchParams(location.search);
+const file = p.get("f") || "";
+const name = p.get("n") || "Curriculum vitae";
+document.getElementById("title").textContent = "CV de " + name;
+document.title = "CV - " + name;
+const dl = document.getElementById("dl");
+dl.href = file;
+
+const box = document.getElementById("pages");
+(async () => {
+  try {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    const pdf = await pdfjsLib.getDocument(file).promise;
+    box.innerHTML = "";
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const vp = page.getViewport({ scale: 2 });
+      const cv = document.createElement("canvas");
+      cv.width = vp.width; cv.height = vp.height;
+      box.appendChild(cv);
+      await page.render({ canvasContext: cv.getContext("2d"), viewport: vp }).promise;
+    }
+  } catch (e) {
+    box.innerHTML = '<div class="msg">Impossible d\'afficher le CV ici. <a href="' + file + '">Ouvrir le PDF directement</a>.</div>';
+  }
+})();
+</script>
+</body>
+</html>

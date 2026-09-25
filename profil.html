@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Profil TOPI</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="topbar">
+  <div class="logo"><img src="topi-logo.png" alt="">TOPI</div>
+  <div class="sep"></div>
+  <img class="ngen" src="ngen-logo.svg" alt="NGen">
+  <nav><a href="index.html" class="on">Candidatures</a><a href="cibles.html">Profils cibles</a><a href="compare.html">Comparaison</a><a href="reporting.html">Reporting</a></nav>
+  <div class="right">Profil candidat · démonstration</div>
+</div>
+<main id="app"></main>
+<div id="tooltip" class="tooltip" role="tooltip"></div>
+<script src="data.js"></script>
+<script src="defs.js"></script>
+<script src="scoring.js"></script>
+<script src="rapport.js"></script>
+<script>
+const id = new URLSearchParams(location.search).get("id");
+const c = CANDIDATS.find(x => x.id === id) || CANDIDATS[0];
+document.title = "Profil TOPI - " + c.prenom + " " + c.nom;
+
+const cible = getCible(c.ref);
+const adq = adequation(c, cible);
+const R = rapport(c), G = guide(c);
+const niv = niveauAdq(adq.global);
+
+const top3 = Object.entries(c.riasec).sort((a, b) => b[1] - a[1]).slice(0, 3);
+const dateFr = new Date(c.date_passage).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+
+const relKey = { "Excellent": "excellent", "Bon": "bon", "Convenable": "convenable", "Mauvais": "mauvais" }[c.validite.niveau] || "convenable";
+const cvUrl = "cv.html?f=" + encodeURIComponent(c.cv) + "&n=" + encodeURIComponent(c.prenom + " " + c.nom);
+const esc = s => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+const tip = (kind, key, inner, cls = "") => `<span class="tip ${cls}" data-kind="${kind}" data-key="${esc(key)}">${inner}</span>`;
+
+function gauge(p) {
+  const r = 52, C = 2 * Math.PI * r;
+  return `<svg viewBox="0 0 130 130" width="150" height="150" class="gauge ${niveauAdq(p)}"><circle cx="65" cy="65" r="${r}" fill="none" stroke="#ECEBE7" stroke-width="12"/><circle cx="65" cy="65" r="${r}" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-dasharray="${C * p / 100} ${C}" transform="rotate(-90 65 65)"/><text x="65" y="70" text-anchor="middle" font-size="30" font-weight="800" fill="currentColor">${p}%</text><text x="65" y="90" text-anchor="middle" font-size="9.5" font-weight="700" fill="#5a5956">${libelleAdq(p).toUpperCase()}</text></svg>`;
+}
+
+function radar() {
+  const cx = 130, cy = 120, R = 84, order = RIA_ORDER;
+  const ang = i => (-90 + i * 60) * Math.PI / 180;
+  const pt = (i, r) => [cx + r * Math.cos(ang(i)), cy + r * Math.sin(ang(i))];
+  const poly = f => order.map((k, i) => pt(i, R * f).join(",")).join(" ");
+  const data = order.map((k, i) => pt(i, R * c.riasec[k] / 100).join(",")).join(" ");
+  const tgt = order.map((k, i) => pt(i, R * cible.riasec[k] / 100).join(",")).join(" ");
+  let s = `<svg viewBox="0 0 260 240" width="100%" style="max-width:300px">`;
+  [0.25, 0.5, 0.75, 1].forEach(f => s += `<polygon points="${poly(f)}" fill="none" stroke="#E0DFDD" stroke-width="1"/>`);
+  order.forEach((k, i) => { const p = pt(i, R); s += `<line x1="${cx}" y1="${cy}" x2="${p[0]}" y2="${p[1]}" stroke="#E0DFDD"/>`; });
+  s += `<polygon points="${tgt}" fill="rgba(201,139,90,.10)" stroke="#C98B5A" stroke-width="2" stroke-dasharray="5 4"/>`;
+  s += `<polygon points="${data}" fill="rgba(72,129,58,.22)" stroke="#48813A" stroke-width="2"/>`;
+  order.forEach((k, i) => {
+    const d = pt(i, R * c.riasec[k] / 100), l = pt(i, R + 16);
+    s += `<circle cx="${d[0]}" cy="${d[1]}" r="3.5" fill="#48813A"/>`;
+    s += `<g class="tip" data-kind="riasec" data-key="${k}" style="cursor:help"><circle cx="${l[0]}" cy="${l[1]}" r="10" fill="#fff" stroke="#E0DFDD"/><text x="${l[0]}" y="${l[1] + 4}" text-anchor="middle" font-size="12" font-weight="700" fill="#1b1d1a">${k}</text></g>`;
+  });
+  return s + "</svg>";
+}
+
+const bar = (labelHtml, v, target) => `<div class="bar"><div><div class="lbl"><span>${labelHtml}</span></div><div class="track"><div class="fill" style="width:${v}%"></div>${target != null ? `<div class="tick" style="left:${target}%" title="Profil cible : ${target}"></div>` : ""}</div></div><div class="val">${v}</div></div>`;
+
+const axes = AXES.map((pair, i) => {
+  const s = c.axes[i], t = cible.axes[i];
+  return `<div class="axis"><div class="${s < 45 ? "on" : ""}">${tip("style", pair[0], pair[0], i.toString())}</div><div class="line">${t != null ? `<div class="tgt" style="left:${t}%" title="Profil cible : ${t}"></div>` : ""}<div class="dot" style="left:${s}%"></div></div><div class="r ${s > 55 ? "on" : ""}">${tip("style", pair[1], pair[1], i.toString())}</div></div>`;
+}).join("");
+
+const subBar = (label, v) => v == null ? "" : `<div class="sub"><div class="sl"><span>${label}</span><b>${v}%</b></div><div class="track"><div class="fill ad-${niveauAdq(v)}" style="width:${v}%"></div></div></div>`;
+const fmtItem = it => it.kind === "axes" && it.cw !== it.tw
+  ? `<b>${it.label}</b><small>candidat : ${it.cw}, poste : ${it.tw}</small>`
+  : `<b>${it.label}</b><small>candidat ${it.cand}, poste ${it.target}</small>`;
+
+document.getElementById("app").innerHTML = `
+  <a class="back" href="javascript:window.close()">Fermer l'onglet</a>
+  <div class="card head">
+    <div class="avatar">${c.prenom[0]}${c.nom[0]}</div>
+    <div>
+      <h1>${c.prenom} ${c.nom}</h1>
+      <div class="meta">${c.parcours} · ${c.age} ans · Candidature ${c.ref}, ${c.poste}</div>
+      <div class="meta">Test TOPI passé le ${dateFr}</div>
+    </div>
+    <div class="actions">
+      <span class="rel rel-${relKey}" title="Indice d'incohérence : ${c.validite.incoherence}"><i></i>Fiabilité des réponses : ${c.validite.niveau}</span>
+      <a class="btn" href="${cvUrl}" target="_blank" rel="noopener">Ouvrir le CV</a>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs"><button data-t="synthese" class="on">Synthèse</button><button data-t="rapport">Rapport</button><button data-t="guide">Guide d'entretien</button></div>
+  <div class="tab" id="tab-synthese">
+  <div class="card adqcard">
+    <div class="gcol">${gauge(adq.global)}<div class="gt">Adéquation au poste</div></div>
+    <div class="scol">
+      <h2>Détail par dimension</h2>
+      ${subBar("Intérêts professionnels (RIASEC)", adq.scores.riasec)}
+      ${subBar("Styles de travail", adq.scores.axes)}
+      ${subBar("Motivations", adq.scores.crit)}
+      <a class="link" href="cibles.html?ref=${c.ref}" target="_blank" rel="noopener">Voir ou modifier le profil cible du poste ${c.ref}</a>
+    </div>
+    <div class="ccol"><h2>Points de convergence</h2>${adq.convergences.map(it => `<div class="pt ok">${fmtItem(it)}</div>`).join("")}</div>
+    <div class="ccol"><h2>Écarts à explorer</h2>${adq.ecarts.map(it => `<div class="pt ko">${fmtItem(it)}</div>`).join("")}</div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>Intérêts professionnels, profil RIASEC</h2>
+      <div class="triplet">${top3.map(e => tip("riasec", e[0], e[0])).join("")}</div>
+      <div class="meta" style="margin-bottom:10px">${top3.map(e => RIASEC_LABELS[e[0]]).join(" · ")}</div>
+      <div style="display:grid;grid-template-columns:300px 1fr;gap:16px;align-items:center">
+        <div>${radar()}</div>
+        <div>${Object.keys(RIASEC_LABELS).map(k => bar(tip("riasec", k, RIASEC_LABELS[k]), c.riasec[k], cible.riasec[k])).join("")}</div>
+      </div>
+      <div class="legend"><span><i class="lg solid"></i>Candidat</span><span><i class="lg dashed"></i>Profil cible du poste</span></div>
+    </div>
+    <div class="card">
+      <h2>Styles de travail, 11 axes</h2>
+      ${axes}
+      <div class="legend"><span><i class="lg dot"></i>Candidat</span><span><i class="lg ring"></i>Profil cible du poste</span></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:18px">
+    <h2>Ce qui le motive</h2>
+    <div class="cols2">${CRITERES.map((k, i) => [k, c.attentes[i]]).sort((a, b) => b[1] - a[1]).map(e => bar(tip("critere", e[0], e[0]), e[1], cible.crit[e[0]])).join("")}</div>
+    <div class="legend"><span><i class="lg bar"></i>Candidat</span><span><i class="lg tickmark"></i>Profil cible du poste (critères sans repère : indifférents pour ce poste)</span></div>
+  </div>
+  </div>
+  <div class="tab" id="tab-rapport" hidden>
+    <div class="card rsum"><h2>Synthèse du rapport</h2><p>${R.resume}</p></div>
+    <div class="grid2">
+      <div class="card"><h2>Forces</h2><ul class="rl ok">${R.forces.map(x => `<li>${x}</li>`).join("")}</ul></div>
+      <div class="card"><h2>Points de vigilance</h2><ul class="rl ko">${R.vig.length ? R.vig.map(x => `<li>${x}</li>`).join("") : "<li>Aucun point de vigilance marqué.</li>"}</ul></div>
+      <div class="card"><h2>Style de management</h2><ul class="rl">${R.mng.map(x => `<li>${x}</li>`).join("")}</ul></div>
+      <div class="card"><h2>Motivation</h2><ul class="rl">${R.motif.map(x => `<li>${x}</li>`).join("")}</ul></div>
+    </div>
+  </div>
+  <div class="tab" id="tab-guide" hidden>
+    <div class="card">
+      <div class="ghead"><div><h2>Guide d'entretien</h2><p>Questions à creuser, dérivées des scores TOPI de ${c.prenom} ${c.nom}. Chaque question indique pourquoi elle est posée.</p></div><button class="btn" onclick="window.print()">Imprimer le guide</button></div>
+      ${(() => { let n = 0, last = ""; return G.map(q => { const h = q.theme !== last ? `<h3 class="gth">${q.theme}</h3>` : ""; last = q.theme; n++; return h + `<div class="q"><span class="qn">${n}</span><div><b>${q.q}</b><small>Pourquoi cette question : ${q.why}</small></div></div>`; }).join(""); })()}
+    </div>
+  </div>
+  <p class="note">Résultats du test TOPI partagés avec le consentement explicite du candidat. Aide à la décision : ils préparent l'entretien, ils ne remplacent pas le jugement du recruteur. Données fictives.</p>
+`;
+
+document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => showTab(b.dataset.t));
+function showTab(t) {
+  document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x.dataset.t === t));
+  document.querySelectorAll(".tab").forEach(x => x.hidden = x.id !== "tab-" + t);
+  history.replaceState(null, "", "#" + t);
+}
+if (["rapport", "guide"].includes(location.hash.slice(1))) showTab(location.hash.slice(1));
+
+const tt = document.getElementById("tooltip");
+function content(el) {
+  const kind = el.dataset.kind, key = el.dataset.key;
+  if (kind === "riasec") return [RIASEC_LABELS[key], DEF_RIASEC[key]];
+  if (kind === "critere") return [key, DEF_CRITERES[key]];
+  const i = AXES.findIndex(p => p.includes(key));
+  return [key + " (" + DIMENSIONS[i] + ")", DEF_STYLES[key]];
+}
+function place(e) {
+  const pad = 14, w = tt.offsetWidth, h = tt.offsetHeight;
+  let x = e.clientX + pad, y = e.clientY + pad;
+  if (x + w > innerWidth - 8) x = e.clientX - w - pad;
+  if (y + h > innerHeight - 8) y = e.clientY - h - pad;
+  tt.style.left = Math.max(8, x) + "px"; tt.style.top = Math.max(8, y) + "px";
+}
+document.addEventListener("mouseover", e => {
+  const el = e.target.closest(".tip");
+  if (!el) return;
+  const [title, text] = content(el);
+  tt.innerHTML = `<b>${title}</b><span>${text}</span>`;
+  tt.style.display = "block"; place(e);
+});
+document.addEventListener("mousemove", e => { if (tt.style.display === "block") place(e); });
+document.addEventListener("mouseout", e => { if (e.target.closest(".tip")) tt.style.display = "none"; });
+</script>
+</body>
+</html>

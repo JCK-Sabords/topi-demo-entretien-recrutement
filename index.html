@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Candidatures ingénieurs - TOPI x NGen</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="topbar">
+  <div class="logo"><img src="topi-logo.png" alt="">TOPI</div>
+  <div class="sep"></div>
+  <img class="ngen" src="ngen-logo.svg" alt="NGen">
+  <nav><a href="index.html" class="on">Candidatures</a><a href="cibles.html">Profils cibles</a><a href="compare.html">Comparaison</a><a href="reporting.html">Reporting</a></nav>
+  <div class="right">Espace recruteur · démonstration</div>
+</div>
+<main class="wide">
+  <div class="pagehead">
+    <div>
+      <h1>Candidatures ingénieurs</h1>
+      <p class="sub">Classées par adéquation avec le profil cible du poste. Cochez 2 ou 3 candidats pour les comparer côte à côte.</p>
+    </div>
+    <div class="actions2">
+      <button class="btn" id="ats" title="Intégration ATS proposée en option">Envoyer vers l'ATS <span class="opt">Option</span></button>
+      <button class="btn" id="export">Exporter en CSV</button>
+      <button class="btn primary" id="cmp" disabled>Comparer (0)</button>
+    </div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="card list">
+    <div class="toolbar2">
+      <div class="search"><input id="q" type="search" placeholder="Rechercher un candidat, un poste, une école..."></div>
+      <button class="btn" id="reset">Réinitialiser</button>
+    </div>
+    <div class="chips2" id="postes"></div>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr id="heads"></tr>
+          <tr class="filters" id="filters"></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="toast" id="toast"></div>
+    <div class="empty" id="empty">Aucun candidat ne correspond aux filtres.</div>
+    <div class="tfoot"><span id="count"></span><span>Adéquation calculée avec le profil cible du poste. Tapez un nombre sous la colonne Adéquation pour afficher les profils au-dessus de ce seuil.</span></div>
+  </div>
+  <p class="foot">Profils partagés avec le consentement explicite des candidats. Le recruteur reste seul décisionnaire. Données fictives.</p>
+</main>
+<script src="data.js"></script>
+<script src="defs.js"></script>
+<script src="scoring.js"></script>
+<script>
+const fmtDate = iso => new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
+const norm = s => String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+const tri = c => Object.entries(c.riasec).sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => e[0]).join("");
+let ADQ = {};
+
+function mini(c) {
+  const order = ["R", "I", "A", "S", "E", "C"], cx = 17, cy = 17, R = 14;
+  const pt = (i, r) => { const a = (-90 + i * 60) * Math.PI / 180; return [cx + r * Math.cos(a), cy + r * Math.sin(a)].join(","); };
+  const ring = order.map((k, i) => pt(i, R)).join(" ");
+  const data = order.map((k, i) => pt(i, R * c.riasec[k] / 100)).join(" ");
+  return `<svg class="mini" viewBox="0 0 34 34" width="34" height="34"><polygon points="${ring}" fill="none" stroke="#D5D3CD"/><polygon points="${data}" fill="rgba(72,129,58,.28)" stroke="#48813A" stroke-width="1.4"/></svg>`;
+}
+
+const picked = new Set();
+const COLS = [
+  { key: "sel", label: "", nofilter: true, nosort: true },
+  { key: "adq", label: "Adéquation", filter: c => ADQ[c.id].global, sort: c => ADQ[c.id].global, placeholder: "ex. 70", min: true },
+  { key: "ref", label: "Référence poste", filter: c => c.ref + " " + c.poste, sort: c => c.ref },
+  { key: "nom", label: "Nom", filter: c => c.nom, sort: c => c.nom },
+  { key: "prenom", label: "Prénom", filter: c => c.prenom, sort: c => c.prenom },
+  { key: "email", label: "Email", filter: c => c.email, sort: c => c.email },
+  { key: "parcours", label: "Parcours", filter: c => c.parcours, sort: c => c.parcours },
+  { key: "date", label: "Candidature", filter: c => fmtDate(c.candidature), sort: c => c.candidature },
+  { key: "cv", label: "CV (PDF)", nofilter: true, nosort: true },
+  { key: "profil", label: "Profil TOPI", filter: c => tri(c), sort: c => tri(c), placeholder: "ex. RE, IC" }
+];
+
+let sortKey = "adq", sortDir = -1, poste = "", q = "";
+const filters = {};
+const heads = document.getElementById("heads"), fil = document.getElementById("filters");
+
+COLS.forEach(col => {
+  const th = document.createElement("th");
+  th.dataset.key = col.key;
+  th.innerHTML = col.label + ' <span class="arrow"></span>';
+  if (!col.nosort) {
+    th.className = "sortable";
+    th.onclick = () => { sortDir = sortKey === col.key ? -sortDir : (col.key === "adq" ? -1 : 1); sortKey = col.key; render(); };
+  }
+  heads.appendChild(th);
+  const td = document.createElement("td");
+  if (!col.nofilter) {
+    const inp = document.createElement("input");
+    inp.placeholder = col.placeholder || "Filtrer";
+    inp.oninput = () => { filters[col.key] = norm(inp.value); render(); };
+    td.appendChild(inp);
+  }
+  fil.appendChild(td);
+});
+
+document.getElementById("q").oninput = e => { q = norm(e.target.value); render(); };
+document.getElementById("reset").onclick = () => {
+  Object.keys(filters).forEach(k => delete filters[k]);
+  fil.querySelectorAll("input").forEach(i => i.value = "");
+  document.getElementById("q").value = ""; q = ""; poste = "";
+  sortKey = "adq"; sortDir = -1; render();
+};
+
+const postes = [...new Map(CANDIDATS.map(c => [c.ref, c.poste])).entries()].sort();
+
+function renderChips() {
+  const el = document.getElementById("postes");
+  const n = ref => CANDIDATS.filter(c => !ref || c.ref === ref).length;
+  el.innerHTML = [["", "Tous les postes"], ...postes.map(([r, t]) => [r, r + " · " + t])].map(([r, t]) =>
+    `<button class="chip2 ${poste === r ? "on" : ""}" data-ref="${r}">${t}<b>${n(r)}</b></button>`).join("");
+  el.querySelectorAll("button").forEach(b => b.onclick = () => { poste = b.dataset.ref; render(); });
+}
+
+function renderKpis() {
+  const vals = CANDIDATS.map(c => ADQ[c.id].global);
+  const moy = Math.round(vals.reduce((s, v) => s + v, 0) / vals.length);
+  const forts = vals.filter(v => v >= 75).length;
+  const fiables = CANDIDATS.filter(c => ["Excellent", "Bon"].includes(c.validite.niveau)).length;
+  const items = [
+    ["Candidatures reçues", CANDIDATS.length, "sur " + postes.length + " postes ouverts"],
+    ["Adéquation moyenne", moy + " %", "avec les profils cibles des postes"],
+    ["Adéquation forte", forts, "profils à 75 % ou plus, à voir en priorité"],
+    ["Réponses fiables", fiables + " / " + CANDIDATS.length, "fiabilité bonne ou excellente au test"]
+  ];
+  document.getElementById("kpis").innerHTML = items.map(([t, v, s]) => `<div class="kpi"><div class="kv">${v}</div><div class="kt">${t}</div><div class="ks">${s}</div></div>`).join("");
+}
+
+const palette = ["#48813A", "#6FA05F", "#7C8F5A", "#B08968", "#5E7C6B", "#8A9A5B"];
+
+function render() {
+  ADQ = Object.fromEntries(CANDIDATS.map(c => [c.id, adqCandidat(c)]));
+  let list = CANDIDATS.filter(c => (!poste || c.ref === poste)
+    && (!q || norm([c.prenom, c.nom, c.email, c.ref, c.poste, c.parcours].join(" ")).includes(q))
+    && COLS.every(col => {
+      const f = filters[col.key];
+      if (!f) return true;
+      if (col.min) { const n = parseFloat(f); return isNaN(n) ? true : col.filter(c) >= n; }
+      return norm(col.filter(c)).includes(f);
+    }));
+  const col = COLS.find(x => x.key === sortKey);
+  list = list.slice().sort((a, b) => {
+    const x = col.sort(a), y = col.sort(b);
+    return (typeof x === "number" ? x - y : String(x).localeCompare(String(y), "fr")) * sortDir;
+  });
+  heads.querySelectorAll("th").forEach(th => {
+    th.querySelector(".arrow").textContent = th.dataset.key === sortKey ? (sortDir === 1 ? "▲" : "▼") : "";
+  });
+  document.getElementById("rows").innerHTML = list.map(c => {
+    const i = CANDIDATS.indexOf(c), a = ADQ[c.id].global;
+    const cvUrl = "cv.html?f=" + encodeURIComponent(c.cv) + "&n=" + encodeURIComponent(c.prenom + " " + c.nom);
+    return `<tr>
+      <td><input type="checkbox" class="pick" data-id="${c.id}" ${picked.has(c.id) ? "checked" : ""} title="Sélectionner pour comparer"></td>
+      <td><div class="adq ${niveauAdq(a)}"><b>${a}%</b><span class="abar"><i style="width:${a}%"></i></span></div></td>
+      <td class="ref">${c.ref}<small>${c.poste}</small></td>
+      <td><div class="who"><span class="av" style="background:${palette[i % palette.length]}">${c.prenom[0]}${c.nom[0]}</span>${c.nom}</div></td>
+      <td>${c.prenom}</td>
+      <td><a href="mailto:${c.email}">${c.email}</a></td>
+      <td class="muted">${c.parcours}</td>
+      <td class="muted nowrap">${fmtDate(c.candidature)}</td>
+      <td><a class="pill cv" href="${cvUrl}" target="_blank" rel="noopener">Ouvrir le CV</a></td>
+      <td><a class="pill topi" href="profil.html?id=${c.id}" target="_blank" rel="noopener">${mini(c)}<span>${tri(c)}</span></a></td>
+    </tr>`;
+  }).join("");
+  document.querySelectorAll("input.pick").forEach(cb => cb.onchange = () => {
+    if (cb.checked && picked.size >= 3) { cb.checked = false; toast("Vous pouvez comparer 3 candidats au maximum."); return; }
+    cb.checked ? picked.add(cb.dataset.id) : picked.delete(cb.dataset.id); updateCmp();
+  });
+  document.getElementById("count").textContent = list.length + " candidat" + (list.length > 1 ? "s" : "") + " affiché" + (list.length > 1 ? "s" : "") + " sur " + CANDIDATS.length;
+  document.getElementById("empty").style.display = list.length ? "none" : "block";
+  renderChips(); renderKpis();
+}
+
+function updateCmp() {
+  const b = document.getElementById("cmp");
+  b.textContent = "Comparer (" + picked.size + ")"; b.disabled = picked.size < 2;
+}
+let toastT;
+function toast(msg) { const el = document.getElementById("toast"); el.textContent = msg; el.style.display = "block"; clearTimeout(toastT); toastT = setTimeout(() => el.style.display = "none", 3500); }
+document.getElementById("cmp").onclick = () => window.open("compare.html?ids=" + [...picked].join(","), "_blank");
+document.getElementById("ats").onclick = () => toast("Intégration ATS proposée en option : elle n'est pas activée dans cette démonstration.");
+document.getElementById("export").onclick = () => {
+  const head = ["Adéquation (%)", "Référence poste", "Poste", "Nom", "Prénom", "Email", "Parcours", "Candidature", "Profil RIASEC", "CV"];
+  const rows = CANDIDATS.slice().sort((a, b) => ADQ[b.id].global - ADQ[a.id].global).map(c => [ADQ[c.id].global, c.ref, c.poste, c.nom, c.prenom, c.email, c.parcours, c.candidature, tri(c), c.cv]);
+  const csv = [head, ...rows].map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(";")).join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
+  a.download = "candidatures-ingenieurs.csv"; a.click();
+};
+
+render();
+</script>
+</body>
+</html>

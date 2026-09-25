@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Reporting trimestriel - TOPI x NGen</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  .qtag { display: inline-block; background: var(--soft); color: var(--blue); font-weight: 700; font-size: 12px; padding: 4px 10px; border-radius: 999px; margin-bottom: 8px; }
+  .brow { display: grid; grid-template-columns: 200px 1fr 60px; gap: 12px; align-items: center; margin: 9px 0; font-size: 12.5px; }
+  .brow .bt { height: 10px; background: #ECEBE7; border-radius: 5px; overflow: hidden; }
+  .brow .bt i { display: block; height: 100%; border-radius: 5px; background: var(--blue); }
+  .brow b { text-align: right; }
+  .hist { display: flex; align-items: flex-end; gap: 10px; height: 170px; padding-top: 10px; }
+  .hist .hb { flex: 1; text-align: center; font-size: 11.5px; color: var(--grey); display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+  .hist .hb i { display: block; border-radius: 6px 6px 0 0; margin-bottom: 6px; }
+  .hist .hb b { color: var(--ink); font-size: 13px; display: block; margin-bottom: 4px; }
+  .insight { border-left: 3px solid var(--blue); padding: 6px 0 6px 12px; margin: 10px 0; font-size: 13px; line-height: 1.5; }
+  .proj { display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 20px; align-items: center; }
+  @media (max-width: 900px) { .proj { grid-template-columns: 1fr; } }
+  .proj label { font-size: 12px; font-weight: 700; color: var(--grey); display: block; margin-bottom: 4px; }
+  .proj input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 14px; }
+  .projr { background: var(--soft); border-radius: 10px; padding: 14px 16px; }
+  .projr b { font-size: 26px; color: var(--blue); }
+  .projr span { display: block; color: var(--grey); font-size: 12px; margin-top: 2px; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="logo"><img src="topi-logo.png" alt="">TOPI</div>
+  <div class="sep"></div>
+  <img class="ngen" src="ngen-logo.svg" alt="NGen">
+  <nav><a href="index.html">Candidatures</a><a href="cibles.html">Profils cibles</a><a href="compare.html">Comparaison</a><a href="reporting.html" class="on">Reporting</a></nav>
+  <div class="right">Espace recruteur · démonstration</div>
+</div>
+<main class="wide">
+  <div class="pagehead">
+    <div>
+      <span class="qtag">Trimestre T3 2026 · juillet à septembre</span>
+      <h1>Reporting trimestriel</h1>
+      <p class="sub">Volumes, qualité des profils et adéquation aux postes. Extrait de démonstration sur les 12 candidatures de la liste.</p>
+    </div>
+    <button class="btn primary" onclick="window.print()">Exporter en PDF</button>
+  </div>
+  <div class="kpis" id="kpis"></div>
+
+  <div class="card" style="margin-bottom:18px">
+    <h2>Temps de tri libéré sur vos volumes (estimation)</h2>
+    <div class="proj">
+      <div><label>Candidatures par semaine</label><input id="pw" type="number" value="100" min="0"></div>
+      <div><label>Minutes gagnées par candidature (hypothèse)</label><input id="pm" type="number" value="3" min="0" step="0.5"></div>
+      <div class="projr" id="pr"></div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h2>Candidatures et adéquation par poste</h2><div id="byPoste"></div></div>
+    <div class="card"><h2>Répartition de l'adéquation</h2><div class="hist" id="hist"></div></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h2>Profil RIASEC dominant</h2><div id="riasec"></div></div>
+    <div class="card"><h2>Fiabilité des réponses au test</h2><div id="fiab"></div></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h2>Motivations les plus fortes, moyenne des candidats</h2><div id="mot"></div></div>
+    <div class="card"><h2>Enseignements du trimestre</h2><div id="ins"></div></div>
+  </div>
+  <p class="foot">Reporting généré automatiquement chaque trimestre à partir des résultats TOPI. Données fictives.</p>
+</main>
+<script src="data.js"></script>
+<script src="defs.js"></script>
+<script src="scoring.js"></script>
+<script>
+const rows = CANDIDATS.map(c => ({ c, a: adqCandidat(c).global }));
+const avg = arr => arr.length ? Math.round(arr.reduce((s, v) => s + v, 0) / arr.length) : 0;
+const bar = (label, v, max, txt, color) => `<div class="brow"><span>${label}</span><div class="bt"><i style="width:${max ? v / max * 100 : 0}%;${color ? "background:" + color : ""}"></i></div><b>${txt}</b></div>`;
+const COL = { high: "#22A55A", mid: "#E08A1E", low: "#DC4A4A" };
+
+const moy = avg(rows.map(r => r.a)), forts = rows.filter(r => r.a >= 75).length;
+const fiables = CANDIDATS.filter(c => ["Excellent", "Bon"].includes(c.validite.niveau)).length;
+const refs = [...new Set(CANDIDATS.map(c => c.ref))].sort();
+document.getElementById("kpis").innerHTML = [
+  ["Candidatures analysées", CANDIDATS.length, "sur " + refs.length + " postes"],
+  ["Adéquation moyenne", moy + " %", "avec les profils cibles"],
+  ["Adéquation forte", forts + " / " + CANDIDATS.length, "profils à 75 % ou plus"],
+  ["Réponses fiables", fiables + " / " + CANDIDATS.length, "fiabilité bonne ou excellente"]
+].map(([t, v, s]) => `<div class="kpi"><div class="kv">${v}</div><div class="kt">${t}</div><div class="ks">${s}</div></div>`).join("");
+
+function proj() {
+  const pw = +document.getElementById("pw").value || 0, pm = +document.getElementById("pm").value || 0;
+  const cand = pw * 13, h = Math.round(cand * pm / 60);
+  document.getElementById("pr").innerHTML = `<b>${h} h</b><span>libérées par trimestre sur environ ${cand.toLocaleString("fr-FR")} candidatures, soit environ ${(h / 8).toFixed(1).replace(".", ",")} jours de travail.</span>`;
+}
+["pw", "pm"].forEach(id => document.getElementById(id).oninput = proj); proj();
+
+const byPoste = refs.map(r => { const l = rows.filter(x => x.c.ref === r); return { r, t: l[0].c.poste, n: l.length, m: avg(l.map(x => x.a)) }; });
+document.getElementById("byPoste").innerHTML = byPoste.map(p => `<div class="brow" style="grid-template-columns:200px 1fr 90px"><span><b>${p.r}</b><br><small style="color:var(--grey)">${p.t} · ${p.n} candidat${p.n > 1 ? "s" : ""}</small></span><div class="bt"><i style="width:${p.m}%;background:${COL[niveauAdq(p.m)]}"></i></div><b>${p.m} %</b></div>`).join("");
+
+const bins = [["< 50", 0, 49], ["50-59", 50, 59], ["60-74", 60, 74], ["75-84", 75, 84], ["85 et +", 85, 100]];
+const counts = bins.map(([, lo, hi]) => rows.filter(r => r.a >= lo && r.a <= hi).length), mx = Math.max(...counts, 1);
+document.getElementById("hist").innerHTML = bins.map(([l, lo], i) => `<div class="hb"><b>${counts[i]}</b><i style="height:${counts[i] / mx * 110}px;background:${COL[niveauAdq(lo)]}"></i>${l} %</div>`).join("");
+
+const dom = {}; CANDIDATS.forEach(c => { const k = Object.entries(c.riasec).sort((a, b) => b[1] - a[1])[0][0]; dom[k] = (dom[k] || 0) + 1; });
+document.getElementById("riasec").innerHTML = RIA_ORDER.map(k => bar(RIASEC_LABELS[k], dom[k] || 0, Math.max(...Object.values(dom)), (dom[k] || 0) + "")).join("");
+
+const lev = ["Excellent", "Bon", "Convenable", "Mauvais"], lc = { Excellent: "#0369A1", Bon: "#16A34A", Convenable: "#D97706", Mauvais: "#DC2626" };
+document.getElementById("fiab").innerHTML = lev.map(l => { const n = CANDIDATS.filter(c => c.validite.niveau === l).length; return bar(l, n, CANDIDATS.length, n + "", lc[l]); }).join("");
+
+const motAvg = CRITERES.map((k, i) => ({ k, v: avg(CANDIDATS.map(c => c.attentes[i])) })).sort((a, b) => b.v - a.v);
+document.getElementById("mot").innerHTML = motAvg.slice(0, 8).map(m => bar(m.k, m.v, 100, m.v + "")).join("");
+
+const best = byPoste.slice().sort((a, b) => b.m - a.m)[0], worst = byPoste.slice().sort((a, b) => a.m - b.m)[0];
+const topDom = Object.entries(dom).sort((a, b) => b[1] - a[1])[0];
+const aVerifier = CANDIDATS.filter(c => !["Excellent", "Bon"].includes(c.validite.niveau)).length;
+document.getElementById("ins").innerHTML = [
+  `<b>${best.t}</b> est le poste où l'adéquation moyenne est la plus élevée (${best.m} %).`,
+  `<b>${worst.t}</b> est le poste le moins bien couvert (${worst.m} % en moyenne) : élargir le sourcing ou revoir le profil cible.`,
+  `Le profil dominant le plus fréquent est <b>${RIASEC_LABELS[topDom[0]].toLowerCase()}</b> (${topDom[1]} candidats sur ${CANDIDATS.length}).`,
+  `La motivation la plus forte est <b>${motAvg[0].k.toLowerCase()}</b> (${motAvg[0].v}/100 en moyenne) : à mettre en avant dans les offres.`,
+  `<b>${aVerifier}</b> profils ont une fiabilité convenable ou mauvaise : à confirmer en entretien.`
+].map(t => `<div class="insight">${t}</div>`).join("");
+</script>
+</body>
+</html>

@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Comparaison de candidats - TOPI x NGen</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  .cmpsel { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  .cmpsel label { font-size: 12px; font-weight: 700; color: var(--grey); display: block; margin-bottom: 4px; }
+  .cmpsel select { min-width: 250px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 13px; background: #fff; }
+  .cols { display: grid; gap: 18px; }
+  .ccard { border-top: 4px solid var(--cc); }
+  .ccard .top { display: flex; align-items: center; gap: 12px; }
+  .ccard .av2 { width: 46px; height: 46px; border-radius: 50%; background: var(--cc); color: #fff; display: grid; place-items: center; font-weight: 800; }
+  .ccard h3 { margin: 0; font-size: 16px; }
+  .ccard .m { color: var(--grey); font-size: 12px; margin-top: 2px; }
+  .ccard .row { display: flex; gap: 10px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
+  .big { font-size: 34px; font-weight: 800; line-height: 1; }
+  .big.high { color: #15803D; } .big.mid { color: #B45309; } .big.low { color: #B91C1C; }
+  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tbl th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .6px; color: var(--grey); padding: 6px 8px; }
+  .tbl td { padding: 9px 8px; border-top: 1px solid var(--line); }
+  .tbl td.c { font-weight: 700; }
+  .best { background: #E8F8E4; border-radius: 6px; }
+  .axr { display: grid; grid-template-columns: 100px 1fr 100px; gap: 12px; align-items: center; margin: 12px 0; font-size: 12px; color: var(--grey); }
+  .axr .r { text-align: right; }
+  .axr .ln { position: relative; height: 4px; background: #E6E4DF; border-radius: 2px; }
+  .axr .ln::after { content: ""; position: absolute; left: 50%; top: -4px; width: 1px; height: 12px; background: #C9C7C1; }
+  .axr .d { position: absolute; top: -5px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px currentColor; background: currentColor; }
+  .lgd { display: flex; gap: 18px; flex-wrap: wrap; margin: 4px 0 12px; font-size: 12px; }
+  .lgd span { display: inline-flex; gap: 6px; align-items: center; font-weight: 700; }
+  .lgd i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .mrow { display: grid; grid-template-columns: 1fr 34px; gap: 8px; align-items: center; margin: 6px 0; font-size: 12.5px; }
+  .mrow .t { height: 7px; background: #ECEBE7; border-radius: 4px; overflow: hidden; margin-top: 3px; }
+  .mrow .t i { display: block; height: 100%; }
+  .mrow b { text-align: right; }
+  .bl { margin: 0; padding: 0 0 0 16px; font-size: 12.5px; line-height: 1.5; }
+  .bl li { margin-bottom: 6px; }
+  .sec3 { margin-top: 18px; }
+  .note2 { color: var(--grey); font-size: 12px; margin-top: 10px; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="logo"><img src="topi-logo.png" alt="">TOPI</div>
+  <div class="sep"></div>
+  <img class="ngen" src="ngen-logo.svg" alt="NGen">
+  <nav><a href="index.html">Candidatures</a><a href="cibles.html">Profils cibles</a><a href="compare.html" class="on">Comparaison</a><a href="reporting.html">Reporting</a></nav>
+  <div class="right">Espace recruteur · démonstration</div>
+</div>
+<main class="wide">
+  <div class="pagehead">
+    <div>
+      <h1>Comparaison de candidats</h1>
+      <p class="sub">Comparez jusqu'à trois candidats côte à côte : adéquation, profil, motivations, forces et vigilances.</p>
+    </div>
+    <button class="btn" onclick="window.print()">Imprimer</button>
+  </div>
+  <div class="cmpsel" id="sel"></div>
+  <div id="out"></div>
+  <p class="foot">L'adéquation est calculée par rapport au profil cible du poste de chaque candidat. Le recruteur reste seul décisionnaire. Données fictives.</p>
+</main>
+<script src="data.js"></script>
+<script src="defs.js"></script>
+<script src="scoring.js"></script>
+<script src="rapport.js"></script>
+<script>
+const COLORS = ["#48813A", "#C98B5A", "#2F6DB5"];
+const params = new URLSearchParams(location.search);
+let ids = (params.get("ids") || "c2,c6,c11").split(",").filter(id => CANDIDATS.some(c => c.id === id)).slice(0, 3);
+if (ids.length < 2) ids = ["c2", "c6", "c11"];
+
+function buildSel() {
+  document.getElementById("sel").innerHTML = [0, 1, 2].map(i => `<div><label>Candidat ${i + 1}${i === 2 ? " (facultatif)" : ""}</label><select data-i="${i}">${i === 2 ? '<option value="">Aucun</option>' : ""}${CANDIDATS.map(c => `<option value="${c.id}" ${ids[i] === c.id ? "selected" : ""}>${c.prenom} ${c.nom} · ${c.ref}</option>`).join("")}</select></div>`).join("");
+  document.querySelectorAll("#sel select").forEach(s => s.onchange = () => {
+    const v = [...document.querySelectorAll("#sel select")].map(x => x.value).filter(Boolean);
+    ids = [...new Set(v)]; if (ids.length < 2) return;
+    history.replaceState(null, "", "?ids=" + ids.join(",")); render();
+  });
+}
+
+function radar(list) {
+  const cx = 130, cy = 120, R = 84, order = RIA_ORDER;
+  const ang = i => (-90 + i * 60) * Math.PI / 180;
+  const pt = (i, r) => [cx + r * Math.cos(ang(i)), cy + r * Math.sin(ang(i))];
+  const poly = f => order.map((k, i) => pt(i, R * f).join(",")).join(" ");
+  let s = `<svg viewBox="0 0 260 240" width="100%" style="max-width:330px">`;
+  [0.25, 0.5, 0.75, 1].forEach(f => s += `<polygon points="${poly(f)}" fill="none" stroke="#E0DFDD"/>`);
+  order.forEach((k, i) => { const p = pt(i, R); s += `<line x1="${cx}" y1="${cy}" x2="${p[0]}" y2="${p[1]}" stroke="#E0DFDD"/>`; });
+  list.forEach((c, n) => { s += `<polygon points="${order.map((k, i) => pt(i, R * c.riasec[k] / 100).join(",")).join(" ")}" fill="${COLORS[n]}" fill-opacity=".16" stroke="${COLORS[n]}" stroke-width="2"/>`; });
+  order.forEach((k, i) => { const l = pt(i, R + 16); s += `<circle cx="${l[0]}" cy="${l[1]}" r="10" fill="#fff" stroke="#E0DFDD"/><text x="${l[0]}" y="${l[1] + 4}" text-anchor="middle" font-size="12" font-weight="700" fill="#1b1d1a">${k}</text>`; });
+  return s + "</svg>";
+}
+
+function render() {
+  const list = ids.map(id => CANDIDATS.find(c => c.id === id));
+  const A = list.map(c => adequation(c, getCible(c.ref)));
+  const Rp = list.map(c => rapport(c));
+  const n = list.length, cols = `grid-template-columns: repeat(${n}, 1fr)`;
+  const relKey = c => ({ "Excellent": "excellent", "Bon": "bon", "Convenable": "convenable", "Mauvais": "mauvais" }[c.validite.niveau] || "convenable");
+  const best = (arr, i) => arr[i] === Math.max(...arr) ? "best" : "";
+  const lgd = `<div class="lgd">${list.map((c, i) => `<span style="color:${COLORS[i]}"><i style="background:${COLORS[i]}"></i>${c.prenom} ${c.nom}</span>`).join("")}</div>`;
+
+  const cards = list.map((c, i) => `
+    <div class="card ccard" style="--cc:${COLORS[i]}">
+      <div class="top"><div class="av2">${c.prenom[0]}${c.nom[0]}</div><div><h3>${c.prenom} ${c.nom}</h3><div class="m">${c.parcours} · ${c.age} ans</div><div class="m">${c.ref} · ${c.poste}</div></div></div>
+      <div class="row"><span class="big ${niveauAdq(A[i].global)}">${A[i].global}%</span><span class="m">adéquation ${libelleAdq(A[i].global).toLowerCase()}</span></div>
+      <div class="row"><span class="rel rel-${relKey(c)}"><i></i>Fiabilité : ${c.validite.niveau}</span></div>
+      <div class="row"><a class="btn" href="cv.html?f=${encodeURIComponent(c.cv)}&n=${encodeURIComponent(c.prenom + " " + c.nom)}" target="_blank" rel="noopener">Ouvrir le CV</a><a class="btn" href="profil.html?id=${c.id}" target="_blank" rel="noopener">Profil TOPI</a></div>
+    </div>`).join("");
+
+  const dims = [["Adéquation globale", A.map(a => a.global)], ["Intérêts professionnels (RIASEC)", A.map(a => a.scores.riasec)], ["Styles de travail", A.map(a => a.scores.axes)], ["Motivations", A.map(a => a.scores.crit)]];
+  const table = `<table class="tbl"><thead><tr><th>Dimension</th>${list.map((c, i) => `<th style="color:${COLORS[i]}">${c.prenom}</th>`).join("")}</tr></thead><tbody>${dims.map(([t, v]) => `<tr><td>${t}</td>${v.map((x, i) => `<td class="c ${best(v, i)}">${x == null ? "-" : x + "%"}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+
+  const axes = AXES.map((pair, k) => `<div class="axr"><div>${pair[0]}</div><div class="ln">${list.map((c, i) => `<span class="d" style="left:${c.axes[k]}%;color:${COLORS[i]}" title="${c.prenom} : ${c.axes[k]}"></span>`).join("")}</div><div class="r">${pair[1]}</div></div>`).join("");
+
+  const mot = list.map((c, i) => `<div>${CRITERES.map((k, j) => ({ k, v: c.attentes[j] })).sort((a, b) => b.v - a.v).slice(0, 6).map(m => `<div class="mrow"><div>${m.k}<div class="t"><i style="width:${m.v}%;background:${COLORS[i]}"></i></div></div><b>${m.v}</b></div>`).join("")}</div>`).join("");
+
+  const fv = (arr, cls) => list.map((c, i) => `<div><ul class="bl">${arr[i].slice(0, 3).map(x => `<li>${x}</li>`).join("")}</ul></div>`).join("");
+
+  document.getElementById("out").innerHTML = `
+    <div class="cols" style="${cols}">${cards}</div>
+    <div class="grid2 sec3">
+      <div class="card"><h2>Intérêts professionnels (RIASEC)</h2>${lgd}<div style="text-align:center">${radar(list)}</div></div>
+      <div class="card"><h2>Adéquation au poste</h2>${table}<p class="note2">Le meilleur score de chaque ligne est surligné.</p></div>
+    </div>
+    <div class="card sec3"><h2>Styles de travail</h2>${lgd}${axes}</div>
+    <div class="card sec3"><h2>Ce qui les motive (6 attentes les plus fortes)</h2><div class="cols" style="${cols}">${mot}</div></div>
+    <div class="card sec3"><h2>Forces principales</h2><div class="cols" style="${cols}">${fv(Rp.map(r => r.forces))}</div></div>
+    <div class="card sec3"><h2>Points de vigilance</h2><div class="cols" style="${cols}">${fv(Rp.map(r => r.vig.length ? r.vig : ["Aucun point de vigilance marqué."]))}</div></div>`;
+}
+buildSel(); render();
+</script>
+</body>
+</html>

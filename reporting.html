@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Reporting trimestriel - TOPI x NGen</title>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=20260925c">
 <style>
   .qtag { display: inline-block; background: var(--soft); color: var(--blue); font-weight: 700; font-size: 12px; padding: 4px 10px; border-radius: 999px; margin-bottom: 8px; }
   .brow { display: grid; grid-template-columns: 200px 1fr 60px; gap: 12px; align-items: center; margin: 9px 0; font-size: 12.5px; }
@@ -69,9 +69,9 @@
   </div>
   <p class="foot">Reporting généré automatiquement chaque trimestre à partir des résultats TOPI. Données fictives.</p>
 </main>
-<script src="data.js"></script>
-<script src="defs.js"></script>
-<script src="scoring.js"></script>
+<script src="data.js?v=20260925c"></script>
+<script src="defs.js?v=20260925c"></script>
+<script src="scoring.js?v=20260925c"></script>
 <script>
 const rows = CANDIDATS.map(c => ({ c, a: adqCandidat(c).global }));
 const avg = arr => arr.length ? Math.round(arr.reduce((s, v) => s + v, 0) / arr.length) : 0;

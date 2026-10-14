@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Reporting trimestriel · TOPI Recrutement</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="icon" href="favicon-32x32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="favicon-192x192.png" sizes="192x192" type="image/png">
+<link rel="stylesheet" href="style.css?v=20261014b">
+<style>
+  .brow { display: grid; grid-template-columns: 200px 1fr 60px; gap: 12px; align-items: center; margin: 10px 0; font-size: 12.5px; color: var(--body); }
+  .brow .bt { height: 8px; background: var(--line); border-radius: 999px; }
+  .brow .bt i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--brand), var(--accent)); animation: grow .9s cubic-bezier(.16, 1, .3, 1) both; }
+  .brow b { text-align: right; font-family: var(--font-mono); font-weight: 500; color: var(--ink); }
+  .brow span b { text-align: left; font-family: var(--font-sans); font-weight: 600; }
+  .hist { display: flex; align-items: flex-end; gap: 10px; height: 170px; padding-top: 10px; }
+  .hist .hb { flex: 1; text-align: center; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .06em; color: var(--muted); display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+  .hist .hb i { display: block; border-radius: 6px 6px 0 0; margin-bottom: 6px; }
+  .hist .hb b { color: var(--ink); font-size: 13px; font-weight: 500; display: block; margin-bottom: 4px; }
+  .insight { border-left: 2px solid var(--accent); padding: 6px 0 6px 12px; margin: 10px 0; font-size: 13px; line-height: 1.55; color: var(--body); }
+  .insight b { color: var(--ink); }
+  .proj { display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 20px; align-items: center; }
+  @media (max-width: 900px) { .proj { grid-template-columns: 1fr; } }
+  .proj label { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 6px; }
+  .proj input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 14px; background: var(--graphite); color: var(--ink); }
+  .proj input:focus { outline: none; border-color: var(--accent); }
+  .fixedv { display: inline-block; min-width: 90px; padding: 4px 0 8px; font-family: var(--font-mono); font-size: 2rem; font-weight: 500; line-height: 1.1; color: var(--ink); border-bottom: 1px solid var(--accent); }
+  .projr { background: color-mix(in srgb, var(--accent) 8%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 12px; padding: 14px 18px; }
+  .projr b { font-family: var(--font-mono); font-size: 1.7rem; font-weight: 500; color: var(--accent); }
+  .projr span { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <a class="logo" href="index.html">TOPI</a>
+  <span class="prod">Recrutement</span>
+  <span class="sep"></span>
+  <nav><a href="index.html">Candidatures</a><a href="cibles.html">Profils cibles</a><a href="compare.html">Comparaison</a><a href="reporting.html" class="on">Reporting</a></nav>
+  <div class="right">Espace recruteur · démonstration</div>
+</header>
+<main class="wide">
+  <div class="pagehead">
+    <div>
+      <div class="eyebrow"><span class="rule"></span>Trimestre T3 2026 · juillet à septembre</div>
+      <h1>Reporting trimestriel</h1>
+      <p class="sub">Volumes, qualité des profils et adéquation aux postes. Extrait de démonstration sur les 12 candidatures de la liste.</p>
+    </div>
+    <button class="btn primary" onclick="window.print()">Exporter en PDF</button>
+  </div>
+  <div class="kpis" id="kpis"></div>
+
+  <div class="card" style="margin-bottom:18px">
+    <h2>Temps de tri libéré sur vos volumes (estimation)</h2>
+    <div class="proj">
+      <div><label>Candidatures cette semaine</label><div class="fixedv" id="pw">92</div></div>
+      <div><label>Minutes gagnées par candidature (hypothèse)</label><input id="pm" type="number" value="3" min="0" step="0.5"></div>
+      <div class="projr" id="pr"></div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h2>Candidatures et adéquation par poste</h2><div id="byPoste"></div></div>
+    <div class="card"><h2>Répartition de l'adéquation</h2><div class="hist" id="hist"></div></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h2>Profil RIASEC dominant</h2><div id="riasec"></div></div>
+    <div class="card"><h2>Fiabilité des réponses au test</h2><div id="fiab"></div></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h2>Motivations les plus fortes, moyenne des candidats</h2><div id="mot"></div></div>
+    <div class="card"><h2>Enseignements du trimestre</h2><div id="ins"></div></div>
+  </div>
+  <p class="foot">Reporting généré automatiquement chaque trimestre à partir des résultats TOPI. Données fictives.</p>
+</main>
+<script src="data.js?v=20261014b"></script>
+<script src="defs.js?v=20261014b"></script>
+<script src="scoring.js?v=20261014b"></script>
+<script>
+const rows = CANDIDATS.map(c => ({ c, a: adqCandidat(c).global }));
+const avg = arr => arr.length ? Math.round(arr.reduce((s, v) => s + v, 0) / arr.length) : 0;
+const bar = (label, v, max, txt, color) => `<div class="brow"><span>${label}</span><div class="bt"><i style="width:${max ? v / max * 100 : 0}%;${color ? "background:" + color : ""}"></i></div><b>${txt}</b></div>`;
+const COL = { high: "linear-gradient(90deg,var(--brand),var(--accent))", mid: "color-mix(in srgb, var(--accent) 45%, transparent)", low: "color-mix(in srgb, var(--accent) 22%, transparent)" };
+const HCOL = { high: "linear-gradient(180deg,var(--accent),var(--brand))", mid: "color-mix(in srgb, var(--accent) 45%, transparent)", low: "color-mix(in srgb, var(--accent) 22%, transparent)" };
+
+const moy = avg(rows.map(r => r.a)), forts = rows.filter(r => r.a >= 75).length;
+const fiables = CANDIDATS.filter(c => ["Excellent", "Bon"].includes(c.validite.niveau)).length;
+const refs = [...new Set(CANDIDATS.map(c => c.ref))].sort();
+document.getElementById("kpis").innerHTML = [
+  ["Candidatures analysées", CANDIDATS.length, "sur " + refs.length + " postes"],
+  ["Adéquation moyenne", moy + " %", "avec les profils cibles"],
+  ["Adéquation forte", forts + " / " + CANDIDATS.length, "profils à 75 % ou plus"],
+  ["Réponses fiables", fiables + " / " + CANDIDATS.length, "fiabilité bonne ou excellente"]
+].map(([t, v, s]) => `<div class="kpi"><div class="kv">${v}</div><div class="kt">${t}</div><div class="ks">${s}</div></div>`).join("");
+
+const CANDIDATURES_SEMAINE = 92;
+function proj() {
+  const pm = +document.getElementById("pm").value || 0;
+  const cand = CANDIDATURES_SEMAINE * 13, h = Math.round(cand * pm / 60);
+  document.getElementById("pr").innerHTML = `<b>${h} h</b><span>libérées par trimestre sur environ ${cand.toLocaleString("fr-FR")} candidatures (${CANDIDATURES_SEMAINE} par semaine sur 13 semaines), soit environ ${(h / 8).toFixed(1).replace(".", ",")} jours de travail.</span>`;
+}
+document.getElementById("pm").oninput = proj; proj();
+
+const byPoste = refs.map(r => { const l = rows.filter(x => x.c.ref === r); return { r, t: l[0].c.poste, n: l.length, m: avg(l.map(x => x.a)) }; });
+document.getElementById("byPoste").innerHTML = byPoste.map(p => `<div class="brow" style="grid-template-columns:200px 1fr 90px"><span><b>${p.r}</b><br><small style="color:var(--muted)">${p.t} · ${p.n} candidat${p.n > 1 ? "s" : ""}</small></span><div class="bt"><i style="width:${p.m}%;background:${COL[niveauAdq(p.m)]}"></i></div><b>${p.m} %</b></div>`).join("");
+
+const bins = [["< 50", 0, 49], ["50-59", 50, 59], ["60-74", 60, 74], ["75-84", 75, 84], ["85 et +", 85, 100]];
+const counts = bins.map(([, lo, hi]) => rows.filter(r => r.a >= lo && r.a <= hi).length), mx = Math.max(...counts, 1);
+document.getElementById("hist").innerHTML = bins.map(([l, lo], i) => `<div class="hb"><b>${counts[i]}</b><i style="height:${counts[i] / mx * 110}px;background:${HCOL[niveauAdq(lo)]}"></i>${l} %</div>`).join("");
+
+const dom = {}; CANDIDATS.forEach(c => { const k = Object.entries(c.riasec).sort((a, b) => b[1] - a[1])[0][0]; dom[k] = (dom[k] || 0) + 1; });
+document.getElementById("riasec").innerHTML = RIA_ORDER.map(k => bar(RIASEC_LABELS[k], dom[k] || 0, Math.max(...Object.values(dom)), (dom[k] || 0) + "")).join("");
+
+const lev = ["Excellent", "Bon", "Convenable", "Mauvais"], lc = { Excellent: "#5B94FF", Bon: "#34C77B", Convenable: "#F0A23B", Mauvais: "#EF5A5A" };
+document.getElementById("fiab").innerHTML = lev.map(l => { const n = CANDIDATS.filter(c => c.validite.niveau === l).length; return bar(l, n, CANDIDATS.length, n + "", lc[l]); }).join("");
+
+const motAvg = CRITERES.map((k, i) => ({ k, v: avg(CANDIDATS.map(c => c.attentes[i])) })).sort((a, b) => b.v - a.v);
+document.getElementById("mot").innerHTML = motAvg.slice(0, 8).map(m => bar(m.k, m.v, 100, m.v + "")).join("");
+
+const best = byPoste.slice().sort((a, b) => b.m - a.m)[0], worst = byPoste.slice().sort((a, b) => a.m - b.m)[0];
+const topDom = Object.entries(dom).sort((a, b) => b[1] - a[1])[0];
+const aVerifier = CANDIDATS.filter(c => !["Excellent", "Bon"].includes(c.validite.niveau)).length;
+document.getElementById("ins").innerHTML = [
+  `<b>${best.t}</b> est le poste où l'adéquation moyenne est la plus élevée (${best.m} %).`,
+  `<b>${worst.t}</b> est le poste le moins bien couvert (${worst.m} % en moyenne) : élargir le sourcing ou revoir le profil cible.`,
+  `Le profil dominant le plus fréquent est <b>${RIASEC_LABELS[topDom[0]].toLowerCase()}</b> (${topDom[1]} candidats sur ${CANDIDATS.length}).`,
+  `La motivation la plus forte est <b>${motAvg[0].k.toLowerCase()}</b> (${motAvg[0].v}/100 en moyenne) : à mettre en avant dans les offres.`,
+  `<b>${aVerifier}</b> profils ont une fiabilité convenable ou mauvaise : à confirmer en entretien.`
+].map(t => `<div class="insight">${t}</div>`).join("");
+</script>
+</body>
+</html>
